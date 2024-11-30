@@ -45,6 +45,7 @@ bool gameOver = false;
 int playerX, playerY, playerWidth = 3;
 
 const int totalInvadersPerRow = 11;
+std::unordered_map<eDisplay, int> invaderWidths{{eDisplay::SQUID, 2}, {eDisplay::CRAB, 3}, {eDisplay::OCTOPUS, 3}, {eDisplay::UFO, 3}};
 std::vector<Invader> invaders;
 
 std::wstring displayValues = L" SCOABU";
@@ -100,8 +101,9 @@ void calculateBarriers(std::vector<int> &barrierPositions, int barrierWidth, int
     }
 }
 
-void calculateInvaders(int fieldWidthMiddle, int invaderWidth, int startY, int endY, eDisplay invaderType, int alignmentOffset = 0)
+void calculateInvaders(int fieldWidthMiddle, int startY, int endY, eDisplay invaderType, int alignmentOffset = 0)
 {
+    int invaderWidth = invaderWidths[invaderType];
     int totalWidthOccupied = totalInvadersPerRow * (invaderWidth + alignmentOffset) + (totalInvadersPerRow - 1) * 1;
     int startX = fieldWidthMiddle - totalWidthOccupied / 2 + alignmentOffset;
 
@@ -126,9 +128,9 @@ void Setup()
     playerY = fieldHeight - 1;
 
     // Populate invaders
-    calculateInvaders(fieldWidthMiddle, 2, 2, 4, eDisplay::SQUID, 1);
-    calculateInvaders(fieldWidthMiddle, 3, 4, 8, eDisplay::CRAB);
-    calculateInvaders(fieldWidthMiddle, 3, 8, 12, eDisplay::OCTOPUS);
+    calculateInvaders(fieldWidthMiddle, 2, 4, eDisplay::SQUID, 1);
+    calculateInvaders(fieldWidthMiddle, 4, 8, eDisplay::CRAB);
+    calculateInvaders(fieldWidthMiddle, 8, 12, eDisplay::OCTOPUS);
 
     // Create playing field
     pField = new unsigned char[fieldWidth * fieldHeight];
@@ -257,13 +259,9 @@ int main()
         }
 
         // Draw invaders
-        // Define the widths of each invader type
-        int invaderWidths[] = {2, 3, 3}; // Assuming eDisplay::SQUID = 0, eDisplay::CRAB = 1, eDisplay::OCTOPUS = 2
-
-        // Draw invaders
         for (const auto &enemy : invaders)
         {
-            int invaderWidth = enemy.type == eDisplay::SQUID ? 2 : 3;
+            int invaderWidth = invaderWidths[enemy.type];
 
             for (int w = 0; w < invaderWidth; ++w)
             {
