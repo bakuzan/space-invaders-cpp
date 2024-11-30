@@ -1,11 +1,15 @@
 #define UNICODE
 #include <algorithm>
+#include <chrono>
 #include <conio.h>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 #include <Windows.h>
+
+using namespace std::chrono_literals;
 
 #ifdef _MSC_VER
 #pragma region Globals
@@ -185,6 +189,7 @@ int main()
     while (!gameOver)
     {
         // Time
+        std::this_thread::sleep_for(50ms);
 
         // Input
         CheckKeyStates(keyStates, keysToCheck);
