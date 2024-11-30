@@ -13,14 +13,16 @@
 
 CONSOLE_SCREEN_BUFFER_INFO sbInfo;
 
-int screenWidth = 40, screenHeight = 40;
+int screenWidth = 80, screenHeight = 60;
 wchar_t *screen;
 
-int fieldWidth = 30, fieldHeight = 30;
+int fieldWidth = 50, fieldHeight = 40;
 unsigned char *pField = nullptr;
 
 bool gameOver = false;
 int playerX, playerY, playerWidth = 3;
+
+std::vector<int> barrierPositions;
 
 std::string keysToCheck = "QAD";
 
@@ -70,6 +72,20 @@ void EnableEcho()
 #pragma endregion Helpers
 #endif
 
+void calculateBarriers(int barrierWidth, int totalBarriers, int fixedSpacing)
+{
+    int totalBarrierWidth = totalBarriers * barrierWidth;
+    int totalFixedSpacing = (totalBarriers - 1) * fixedSpacing;
+    int totalRemainingSpace = fieldWidth - totalBarrierWidth - totalFixedSpacing;
+    int endSpacing = totalRemainingSpace / 2;
+    int currentPos = endSpacing;
+    for (int i = 0; i < totalBarriers; ++i)
+    {
+        barrierPositions.push_back(currentPos);
+        currentPos += barrierWidth + fixedSpacing;
+    }
+}
+
 void Setup()
 {
     gameOver = false;
@@ -78,13 +94,43 @@ void Setup()
 
     // Create playing field
     pField = new unsigned char[fieldWidth * fieldHeight];
+    int barrierWidth = 5;
+    int totalBarriers = 4;
+    int fixedSpacing = 5;
+    calculateBarriers(barrierWidth, totalBarriers, fixedSpacing);
+
     for (int x = 0; x < fieldWidth; ++x)
     {
         for (int y = 0; y < fieldHeight; ++y)
         {
             int cell = (fieldWidth * y) + x;
+            bool isBarrier = false;
+            bool isBottomRow = fieldHeight - 3 == y;
+            bool isTopRow = fieldHeight - 6 == y;
+            bool isBarrierRow = (isBottomRow || (fieldHeight - 4 == y) || (fieldHeight - 5 == y) || isTopRow);
 
-            pField[cell] = eDisplay::SPACE;
+            for (int start : barrierPositions)
+            {
+                int center = start + barrierWidth / 2;
+
+                if (x >= start && x < start + barrierWidth && isBarrierRow)
+                {
+                    bool isMiddle = (x >= center - 1 && x <= center + 1);
+                    bool isMiddleRemoved = isBottomRow && isMiddle;
+                    bool isEdgeRemoved = isTopRow && !isMiddle;
+                    isBarrier = true && !isMiddleRemoved && !isEdgeRemoved;
+                    break;
+                }
+            }
+
+            if (isBarrier)
+            {
+                pField[cell] = eDisplay::BARRIER;
+            }
+            else
+            {
+                pField[cell] = eDisplay::SPACE;
+            }
         }
     }
 }
