@@ -17,19 +17,6 @@ using namespace std::chrono_literals;
 
 CONSOLE_SCREEN_BUFFER_INFO sbInfo;
 
-int screenWidth = 80, screenHeight = 60;
-wchar_t *screen;
-
-int fieldWidth = 50, fieldHeight = 40;
-unsigned char *pField = nullptr;
-
-bool gameOver = false;
-int playerX, playerY, playerWidth = 3;
-
-std::vector<int> barrierPositions;
-
-std::string keysToCheck = "QAD";
-
 enum eDisplay
 {
     SPACE = 0,
@@ -37,8 +24,31 @@ enum eDisplay
     CRAB = 2,
     OCTOPUS = 3,
     PLAYER = 4,
-    BARRIER = 5
+    BARRIER = 5,
+    UFO = 6
 };
+
+struct Invader
+{
+    eDisplay type;
+    int x;
+    int y;
+};
+
+int screenWidth = 80, screenHeight = 30;
+wchar_t *screen;
+
+int fieldWidth = 51, fieldHeight = 25;
+unsigned char *pField = nullptr;
+
+bool gameOver = false;
+int playerX, playerY, playerWidth = 3;
+
+const int totalInvadersPerRow = 11;
+std::vector<Invader> invaders;
+
+std::wstring displayValues = L" SCOABU";
+std::string keysToCheck = "QAD";
 
 #ifdef _MSC_VER
 #pragma endregion Globals
@@ -76,7 +86,7 @@ void EnableEcho()
 #pragma endregion Helpers
 #endif
 
-void calculateBarriers(int barrierWidth, int totalBarriers, int fixedSpacing)
+void calculateBarriers(std::vector<int> &barrierPositions, int barrierWidth, int totalBarriers, int fixedSpacing)
 {
     int totalBarrierWidth = totalBarriers * barrierWidth;
     int totalFixedSpacing = (totalBarriers - 1) * fixedSpacing;
@@ -90,18 +100,44 @@ void calculateBarriers(int barrierWidth, int totalBarriers, int fixedSpacing)
     }
 }
 
+void calculateInvaders(int fieldWidthMiddle, int invaderWidth, int startY, int endY, eDisplay invaderType, int alignmentOffset = 0)
+{
+    int totalWidthOccupied = totalInvadersPerRow * (invaderWidth + alignmentOffset) + (totalInvadersPerRow - 1) * 1;
+    int startX = fieldWidthMiddle - totalWidthOccupied / 2 + alignmentOffset;
+
+    for (int y = startY; y < endY; y += 2)
+    {
+        int x = startX;
+
+        for (int i = 0; i < totalInvadersPerRow; ++i)
+        {
+            invaders.push_back({invaderType, x, y});
+            x += invaderWidth + alignmentOffset + 1;
+        }
+    }
+}
+
 void Setup()
 {
     gameOver = false;
-    playerX = fieldWidth / 2;
+
+    int fieldWidthMiddle = fieldWidth / 2;
+    playerX = fieldWidthMiddle;
     playerY = fieldHeight - 1;
+
+    // Populate invaders
+    calculateInvaders(fieldWidthMiddle, 2, 2, 4, eDisplay::SQUID, 1);
+    calculateInvaders(fieldWidthMiddle, 3, 4, 8, eDisplay::CRAB);
+    calculateInvaders(fieldWidthMiddle, 3, 8, 12, eDisplay::OCTOPUS);
 
     // Create playing field
     pField = new unsigned char[fieldWidth * fieldHeight];
+
+    std::vector<int> barrierPositions;
     int barrierWidth = 5;
     int totalBarriers = 4;
     int fixedSpacing = 5;
-    calculateBarriers(barrierWidth, totalBarriers, fixedSpacing);
+    calculateBarriers(barrierPositions, barrierWidth, totalBarriers, fixedSpacing);
 
     for (int x = 0; x < fieldWidth; ++x)
     {
@@ -213,11 +249,26 @@ int main()
         {
             for (int y = 0; y < fieldHeight; ++y)
             {
-                screen[(screenWidth * y) + x] = L" SCOAB"[pField[(fieldWidth * y) + x]];
+                screen[(screenWidth * y) + x] = displayValues[pField[(fieldWidth * y) + x]];
             }
 
             // Display line at the bottom of the field
             screen[(screenWidth * fieldHeight) + x] = L'_';
+        }
+
+        // Draw invaders
+        // Define the widths of each invader type
+        int invaderWidths[] = {2, 3, 3}; // Assuming eDisplay::SQUID = 0, eDisplay::CRAB = 1, eDisplay::OCTOPUS = 2
+
+        // Draw invaders
+        for (const auto &enemy : invaders)
+        {
+            int invaderWidth = enemy.type == eDisplay::SQUID ? 2 : 3;
+
+            for (int w = 0; w < invaderWidth; ++w)
+            {
+                screen[(screenWidth * enemy.y) + enemy.x + w] = displayValues[enemy.type];
+            }
         }
 
         // Draw player
