@@ -28,6 +28,14 @@ enum eDisplay
     UFO = 6
 };
 
+enum eDirection
+{
+    RIGHT = 0,
+    DOWN = 1,
+    LEFT = 2,
+    UP = 3
+};
+
 struct Invader
 {
     eDisplay type;
@@ -187,7 +195,79 @@ void CheckKeyStates(std::unordered_map<char, bool> &keyStates, const std::string
 
 bool CanMovePlayer(int newPlayerX)
 {
-    return newPlayerX >= 0 && newPlayerX + (playerWidth - 1) < fieldWidth;
+    return newPlayerX >= 0 &&
+           ((newPlayerX + (playerWidth - 1)) < fieldWidth);
+}
+
+int GetNextMovingRow(int limit = -1)
+{
+    auto max_y_it = std::max_element(invaders.cbegin(), invaders.cend(),
+                                     [limit](const Invader &a, const Invader &b)
+                                     {
+                                         if (limit != -1)
+                                         {
+                                             if (a.y >= limit)
+                                                 return true; // If a.y exceeds limit, consider it "less" so it isn't picked.
+                                             if (b.y >= limit)
+                                                 return false; // If b.y exceeds limit, consider it "less" so it isn't picked.
+                                         }
+                                         return a.y < b.y;
+                                     });
+
+    if (max_y_it != invaders.end() &&
+        (limit == -1 ||
+         max_y_it->y < limit))
+    {
+        return max_y_it->y;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+bool CanInvaderMove(eDirection moveDirection, eDisplay invaderType, int invaderX)
+{
+    switch (moveDirection)
+    {
+    case eDirection::RIGHT:
+    {
+        int widthAdjustment = invaderWidths[invaderType] - 1;
+        return invaderX + widthAdjustment < fieldWidth - 1;
+    }
+    case eDirection::LEFT:
+    {
+        return invaderX > 0;
+    }
+    default:
+    {
+        throw std::invalid_argument("Invalid Direction for Invaders to move in!");
+    }
+    }
+}
+
+bool CheckInvadersAreAtLeftWall()
+{
+    auto min_x_it = std::min_element(invaders.cbegin(), invaders.cend(),
+                                     [](const Invader &a, const Invader &b)
+                                     {
+                                         return a.x < b.x;
+                                     });
+
+    return min_x_it != invaders.cend() &&
+           !CanInvaderMove(eDirection::LEFT, min_x_it->type, min_x_it->x);
+}
+
+bool CheckInvadersAreAtRightWall()
+{
+    auto max_x_it = std::max_element(invaders.cbegin(), invaders.cend(),
+                                     [](const Invader &a, const Invader &b)
+                                     {
+                                         return a.x < b.x;
+                                     });
+
+    return max_x_it != invaders.cend() &&
+           !CanInvaderMove(eDirection::RIGHT, max_x_it->type, max_x_it->x);
 }
 
 int main()
@@ -220,7 +300,9 @@ int main()
     DWORD dwBytesWritten = 0;
 
     Setup();
-
+    int drawOffsetX = 2;
+    int movingInvaderY = GetNextMovingRow();
+    eDirection invadersDirection = eDirection::RIGHT;
     std::unordered_map<char, bool> keyStates;
 
     // Run Game
@@ -229,7 +311,8 @@ int main()
         // Time
         std::this_thread::sleep_for(50ms);
 
-        // Input
+        /* Input START
+         */
         CheckKeyStates(keyStates, keysToCheck);
         if (keyStates['A'] && CanMovePlayer(playerX - 1))
         {
@@ -244,18 +327,69 @@ int main()
             gameOver = true;
         }
 
-        // Logic
+        /* Input END
+         */
 
-        // Draw
+        /* Logic START
+         */
+
+        // Invader movement
+        for (auto &enemy : invaders)
+        {
+            if (invadersDirection == eDirection::DOWN)
+            {
+                enemy.y += 1;
+                continue;
+            }
+
+            if (enemy.y != movingInvaderY)
+            {
+                continue;
+            }
+
+            enemy.x += invadersDirection == eDirection::RIGHT
+                           ? 1
+                           : -1;
+        }
+
+        movingInvaderY = GetNextMovingRow(movingInvaderY);
+        if (movingInvaderY == -1)
+        {
+            if (
+                ((invadersDirection == eDirection::RIGHT &&
+                  CheckInvadersAreAtRightWall()) ||
+                 (invadersDirection == eDirection::LEFT &&
+                  CheckInvadersAreAtLeftWall())))
+            {
+                movingInvaderY = -1; // Will allow reset on next pass
+                invadersDirection = eDirection::DOWN;
+            }
+            else
+            {
+                movingInvaderY = GetNextMovingRow();
+            }
+        }
+        else if (invadersDirection == eDirection::DOWN &&
+                 movingInvaderY != -1)
+        {
+            invadersDirection =
+                CheckInvadersAreAtLeftWall() ? eDirection::RIGHT : eDirection::LEFT;
+        }
+
+        /* Logic END
+         */
+
+        /* Draw START
+         */
         for (int x = 0; x < fieldWidth; ++x)
         {
             for (int y = 0; y < fieldHeight; ++y)
             {
-                screen[(screenWidth * y) + x] = displayValues[pField[(fieldWidth * y) + x]];
+                screen[(screenWidth * y) + (x + drawOffsetX)] = displayValues[pField[(fieldWidth * y) + x]];
             }
 
             // Display line at the bottom of the field
-            screen[(screenWidth * fieldHeight) + x] = L'_';
+            screen[(screenWidth * fieldHeight) + (x + drawOffsetX)] = L'_';
         }
 
         // Draw invaders
@@ -265,16 +399,19 @@ int main()
 
             for (int w = 0; w < invaderWidth; ++w)
             {
-                screen[(screenWidth * enemy.y) + enemy.x + w] = displayValues[enemy.type];
+                screen[(screenWidth * enemy.y) + enemy.x + w + drawOffsetX] = displayValues[enemy.type];
             }
         }
 
         // Draw player
         for (int px = 0; px < playerWidth; ++px)
         {
-            int cell = (screenWidth * playerY) + (playerX + px);
+            int cell = (screenWidth * playerY) + (playerX + px + drawOffsetX);
             screen[cell] = L'A';
         }
+
+        /* Draw END
+         */
 
         // Display
         WriteConsoleOutputCharacterW(hConsole, screen, screenWidth * screenHeight, {0, 0}, &dwBytesWritten);
