@@ -43,7 +43,15 @@ struct Invader
     int y;
 };
 
-int screenWidth = 80, screenHeight = 30;
+struct Bullet
+{
+    eDirection direction;
+    int x;
+    int y;
+};
+
+int screenWidth = 80,
+    screenHeight = 30;
 wchar_t *screen;
 
 int fieldWidth = 51, fieldHeight = 25;
@@ -56,8 +64,10 @@ const int totalInvadersPerRow = 11;
 std::unordered_map<eDisplay, int> invaderWidths{{eDisplay::SQUID, 2}, {eDisplay::CRAB, 3}, {eDisplay::OCTOPUS, 3}, {eDisplay::UFO, 3}};
 std::vector<Invader> invaders;
 
+std::vector<Bullet> bullets;
+
 std::wstring displayValues = L" SCOABU";
-std::string keysToCheck = "QAD";
+std::string keysToCheck = " QAD";
 
 #ifdef _MSC_VER
 #pragma endregion Globals
@@ -270,6 +280,12 @@ bool CheckInvadersAreAtRightWall()
            !CanInvaderMove(eDirection::RIGHT, max_x_it->type, max_x_it->x);
 }
 
+bool CanBulletMove(int newBulletY)
+{
+    return newBulletY >= 0 &&
+           newBulletY <= fieldHeight;
+}
+
 int main()
 {
     DisableEcho();
@@ -326,6 +342,11 @@ int main()
         {
             gameOver = true;
         }
+        if (keyStates[' '])
+        {
+            // Player is 3 wide, so we want it to come from the middle
+            bullets.push_back({eDirection::UP, playerX + 1, playerY});
+        }
 
         /* Input END
          */
@@ -376,6 +397,28 @@ int main()
                 CheckInvadersAreAtLeftWall() ? eDirection::RIGHT : eDirection::LEFT;
         }
 
+        // Bullet movement
+        for (auto it = bullets.begin(); it != bullets.end();)
+        {
+            int diffY = it->direction == eDirection::UP
+                            ? -1
+                            : 1;
+
+            if (CanBulletMove(it->y + diffY))
+            {
+                it->y += diffY;
+                ++it;
+            }
+            else
+            {
+                it = bullets.erase(it);
+            }
+
+            // TODO
+            // Check if bullet hit something
+            // Remove what need be removed, add an "explosion"
+        }
+
         /* Logic END
          */
 
@@ -408,6 +451,13 @@ int main()
         {
             int cell = (screenWidth * playerY) + (playerX + px + drawOffsetX);
             screen[cell] = L'A';
+        }
+
+        // Draw bullets
+        for (const auto &b : bullets)
+        {
+            int cell = (screenWidth * b.y) + (b.x + drawOffsetX);
+            screen[cell] = L'|';
         }
 
         /* Draw END
