@@ -427,8 +427,8 @@ int main()
             // Hit barrier?
             if (pField[(fieldWidth * it->y) + it->x] == eDisplay::BARRIER)
             {
-                pField[(fieldWidth * it->y) + it->x] = eDisplay::SPACE;
                 explosions.push_back({it->x, it->y});
+                pField[(fieldWidth * it->y) + it->x] = eDisplay::SPACE;
                 it = bullets.erase(it);
                 continue;
             }
@@ -452,8 +452,13 @@ int main()
 
                 if (enemyIt != invaders.end())
                 {
+                    int invaderWidth = invaderWidths[enemyIt->type];
+                    for (int dx = 0; dx < invaderWidth; ++dx)
+                    {
+                        explosions.push_back({enemyIt->x + dx, enemyIt->y});
+                    }
+
                     invaders.erase(enemyIt);
-                    explosions.push_back({it->x, it->y});
                     it = bullets.erase(it);
                     continue;
                 }
