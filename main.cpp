@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <chrono>
 #include <conio.h>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -41,6 +42,7 @@ struct Invader
     eDisplay type;
     int x;
     int y;
+    int shootingCooldown = 0;
 };
 
 struct Bullet
@@ -64,6 +66,7 @@ int fieldWidth = 51, fieldHeight = 25;
 unsigned char *pField = nullptr;
 
 bool gameOver = false;
+int playerLives = 3;
 int playerX, playerY, playerWidth = 3;
 
 const int totalInvadersPerRow = 11;
@@ -407,6 +410,21 @@ int main()
                 CheckInvadersAreAtLeftWall() ? eDirection::RIGHT : eDirection::LEFT;
         }
 
+        // Invaders shoot?
+        int invaderCount = invaders.size();
+        for (auto &enemy : invaders)
+        {
+            if (enemy.shootingCooldown > 0)
+            {
+                enemy.shootingCooldown--;
+            }
+            else if (rand() % 1000 < 1)
+            {
+                enemy.shootingCooldown = 4 * invaderCount;
+                bullets.push_back({eDirection::DOWN, enemy.x + 1, enemy.y});
+            }
+        }
+
         // Bullet movement
         for (auto it = bullets.begin(); it != bullets.end();)
         {
@@ -463,6 +481,41 @@ int main()
                     continue;
                 }
             }
+            else
+            {
+                // Hit player?
+                bool playerHit = false;
+                for (int dx = 0; dx < playerWidth; ++dx)
+                {
+                    if ((playerX + dx) == it->x && playerY == it->y)
+                    {
+                        playerLives -= 1;
+                        if (playerLives == 0)
+                        {
+                            gameOver = true;
+                        }
+
+                        // Blow up player
+                        for (int dx = 0; dx < playerWidth; ++dx)
+                        {
+                            explosions.push_back({playerX + dx, playerY});
+                        }
+
+                        // Re-center player on death
+                        playerX = fieldWidth / 2;
+                        playerY = fieldHeight - 1;
+
+                        it = bullets.erase(it);
+                        playerHit = true;
+                        break;
+                    }
+                }
+
+                if (playerHit)
+                {
+                    continue;
+                }
+            }
 
             // Go next bullet
             ++it;
@@ -516,6 +569,19 @@ int main()
             screen[cell] = L'A';
         }
 
+        // Draw game information
+        std::wstring playerIcon(playerWidth, displayValues[eDisplay::PLAYER]);
+        std::wstring livesDisplay = std::to_wstring(playerLives) + L" " + playerIcon;
+
+        for (int i = 1; i < playerLives; ++i)
+        {
+            livesDisplay += L" " + playerIcon;
+        }
+
+        size_t length = livesDisplay.length();
+        swprintf_s(&screen[(screenWidth * (fieldHeight + 2)) + (drawOffsetX)], length + 1, L"%s", livesDisplay.c_str());
+        screen[(screenWidth * (fieldHeight + 2)) + (drawOffsetX) + length] = L'\0';
+
         /* Draw END
          */
 
@@ -529,7 +595,7 @@ int main()
     EnableEcho();
 
     // Wrap up the game
-    // TODO
+    std::cout << "Game Over!" << std::endl;
 
     // Wait to close...
     ClearInputBuffer();
