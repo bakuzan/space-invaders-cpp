@@ -50,6 +50,12 @@ struct Bullet
     int y;
 };
 
+struct Explosion
+{
+    int x;
+    int y;
+};
+
 int screenWidth = 80,
     screenHeight = 30;
 wchar_t *screen;
@@ -65,6 +71,7 @@ std::unordered_map<eDisplay, int> invaderWidths{{eDisplay::SQUID, 2}, {eDisplay:
 std::vector<Invader> invaders;
 
 std::vector<Bullet> bullets;
+std::vector<Explosion> explosions;
 
 std::wstring displayValues = L" SCOABU";
 std::string keysToCheck = " QAD";
@@ -354,6 +361,9 @@ int main()
         /* Logic START
          */
 
+        // Clear down explosions
+        explosions.clear();
+
         // Invader movement
         for (auto &enemy : invaders)
         {
@@ -407,16 +417,50 @@ int main()
             if (CanBulletMove(it->y + diffY))
             {
                 it->y += diffY;
-                ++it;
             }
             else
             {
                 it = bullets.erase(it);
+                continue;
             }
 
-            // TODO
-            // Check if bullet hit something
-            // Remove what need be removed, add an "explosion"
+            // Hit barrier?
+            if (pField[(fieldWidth * it->y) + it->x] == eDisplay::BARRIER)
+            {
+                pField[(fieldWidth * it->y) + it->x] = eDisplay::SPACE;
+                explosions.push_back({it->x, it->y});
+                it = bullets.erase(it);
+                continue;
+            }
+
+            if (it->direction == eDirection::UP)
+            {
+                // Hit invader?
+                auto enemyIt = std::find_if(invaders.begin(), invaders.end(),
+                                            [&it](Invader a)
+                                            {
+                                                int invaderWidth = invaderWidths[a.type];
+                                                for (int dx = 0; dx < invaderWidth; ++dx)
+                                                {
+                                                    if ((a.x + dx) == it->x && a.y == it->y)
+                                                    {
+                                                        return true;
+                                                    }
+                                                }
+                                                return false;
+                                            });
+
+                if (enemyIt != invaders.end())
+                {
+                    invaders.erase(enemyIt);
+                    explosions.push_back({it->x, it->y});
+                    it = bullets.erase(it);
+                    continue;
+                }
+            }
+
+            // Go next bullet
+            ++it;
         }
 
         /* Logic END
@@ -446,18 +490,25 @@ int main()
             }
         }
 
-        // Draw player
-        for (int px = 0; px < playerWidth; ++px)
-        {
-            int cell = (screenWidth * playerY) + (playerX + px + drawOffsetX);
-            screen[cell] = L'A';
-        }
-
         // Draw bullets
         for (const auto &b : bullets)
         {
             int cell = (screenWidth * b.y) + (b.x + drawOffsetX);
             screen[cell] = L'|';
+        }
+
+        // Draw explosions
+        for (const auto &e : explosions)
+        {
+            int cell = (screenWidth * e.y) + (e.x + drawOffsetX);
+            screen[cell] = L'*';
+        }
+
+        // Draw player
+        for (int px = 0; px < playerWidth; ++px)
+        {
+            int cell = (screenWidth * playerY) + (playerX + px + drawOffsetX);
+            screen[cell] = L'A';
         }
 
         /* Draw END
