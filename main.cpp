@@ -77,6 +77,9 @@ std::unordered_map<eDisplay, int> invaderScores{{eDisplay::SQUID, 30}, {eDisplay
 std::unordered_map<eDisplay, int> invaderWidths{{eDisplay::SQUID, 2}, {eDisplay::CRAB, 3}, {eDisplay::OCTOPUS, 3}, {eDisplay::UFO, 3}};
 std::vector<Invader> invaders;
 
+int movingInvaderY;
+eDirection invadersDirection = eDirection::RIGHT;
+
 std::vector<Bullet> bullets;
 std::vector<Explosion> explosions;
 
@@ -165,65 +168,6 @@ void calculateInvaders(int fieldWidthMiddle, int startY, int endY, eDisplay inva
         {
             invaders.push_back({invaderType, x, y});
             x += invaderWidth + alignmentOffset + 1;
-        }
-    }
-}
-
-void Setup()
-{
-    gameOver = false;
-
-    int fieldWidthMiddle = fieldWidth / 2;
-    playerX = fieldWidthMiddle;
-    playerY = fieldHeight - 1;
-    score = 0;
-
-    // Populate invaders
-    calculateInvaders(fieldWidthMiddle, 2, 4, eDisplay::SQUID, 1);
-    calculateInvaders(fieldWidthMiddle, 4, 8, eDisplay::CRAB);
-    calculateInvaders(fieldWidthMiddle, 8, 12, eDisplay::OCTOPUS);
-
-    // Create playing field
-    pField = new unsigned char[fieldWidth * fieldHeight];
-
-    std::vector<int> barrierPositions;
-    int barrierWidth = 5;
-    int totalBarriers = 4;
-    int fixedSpacing = 5;
-    calculateBarriers(barrierPositions, barrierWidth, totalBarriers, fixedSpacing);
-
-    for (int x = 0; x < fieldWidth; ++x)
-    {
-        for (int y = 0; y < fieldHeight; ++y)
-        {
-            int cell = (fieldWidth * y) + x;
-            bool isBarrier = false;
-            bool isBottomRow = fieldHeight - 3 == y;
-            bool isTopRow = fieldHeight - 6 == y;
-            bool isBarrierRow = (isBottomRow || (fieldHeight - 4 == y) || (fieldHeight - 5 == y) || isTopRow);
-
-            for (int start : barrierPositions)
-            {
-                int center = start + barrierWidth / 2;
-
-                if (x >= start && x < start + barrierWidth && isBarrierRow)
-                {
-                    bool isMiddle = (x >= center - 1 && x <= center + 1);
-                    bool isMiddleRemoved = isBottomRow && isMiddle;
-                    bool isEdgeRemoved = isTopRow && !isMiddle;
-                    isBarrier = true && !isMiddleRemoved && !isEdgeRemoved;
-                    break;
-                }
-            }
-
-            if (isBarrier)
-            {
-                pField[cell] = eDisplay::BARRIER;
-            }
-            else
-            {
-                pField[cell] = eDisplay::SPACE;
-            }
         }
     }
 }
@@ -319,6 +263,146 @@ bool CanBulletMove(int newBulletY)
            newBulletY <= fieldHeight;
 }
 
+#ifdef _MSC_VER
+#pragma region Main Loop Functions
+#endif
+
+void Setup()
+{
+    gameOver = false;
+
+    int fieldWidthMiddle = fieldWidth / 2;
+    playerX = fieldWidthMiddle;
+    playerY = fieldHeight - 1;
+
+    // Clear down
+    bullets.clear();
+    explosions.clear();
+
+    // Populate invaders
+    calculateInvaders(fieldWidthMiddle, 2, 4, eDisplay::SQUID, 1);
+    calculateInvaders(fieldWidthMiddle, 4, 8, eDisplay::CRAB);
+    calculateInvaders(fieldWidthMiddle, 8, 12, eDisplay::OCTOPUS);
+
+    // Invader movement starting
+    movingInvaderY = GetNextMovingRow();
+    invadersDirection = eDirection::RIGHT;
+
+    // Create playing field
+    pField = new unsigned char[fieldWidth * fieldHeight];
+
+    std::vector<int> barrierPositions;
+    int barrierWidth = 5;
+    int totalBarriers = 4;
+    int fixedSpacing = 5;
+    calculateBarriers(barrierPositions, barrierWidth, totalBarriers, fixedSpacing);
+
+    for (int x = 0; x < fieldWidth; ++x)
+    {
+        for (int y = 0; y < fieldHeight; ++y)
+        {
+            int cell = (fieldWidth * y) + x;
+            bool isBarrier = false;
+            bool isBottomRow = fieldHeight - 3 == y;
+            bool isTopRow = fieldHeight - 6 == y;
+            bool isBarrierRow = (isBottomRow || (fieldHeight - 4 == y) || (fieldHeight - 5 == y) || isTopRow);
+
+            for (int start : barrierPositions)
+            {
+                int center = start + barrierWidth / 2;
+
+                if (x >= start && x < start + barrierWidth && isBarrierRow)
+                {
+                    bool isMiddle = (x >= center - 1 && x <= center + 1);
+                    bool isMiddleRemoved = isBottomRow && isMiddle;
+                    bool isEdgeRemoved = isTopRow && !isMiddle;
+                    isBarrier = true && !isMiddleRemoved && !isEdgeRemoved;
+                    break;
+                }
+            }
+
+            if (isBarrier)
+            {
+                pField[cell] = eDisplay::BARRIER;
+            }
+            else
+            {
+                pField[cell] = eDisplay::SPACE;
+            }
+        }
+    }
+}
+
+void Draw(int drawOffset)
+{
+    int actualHeight = fieldHeight + drawOffset;
+    for (int x = 0; x < fieldWidth; ++x)
+    {
+        for (int y = 0; y < fieldHeight; ++y)
+        {
+            screen[(screenWidth * (y + drawOffset)) + (x + drawOffset)] = displayValues[pField[(fieldWidth * y) + x]];
+        }
+
+        // Display line at the bottom of the field
+        screen[(screenWidth * actualHeight) + (x + drawOffset)] = L'_';
+    }
+
+    // Draw invaders
+    for (const auto &enemy : invaders)
+    {
+        int invaderWidth = invaderWidths[enemy.type];
+
+        for (int w = 0; w < invaderWidth; ++w)
+        {
+            screen[(screenWidth * (enemy.y + drawOffset)) + enemy.x + w + drawOffset] = displayValues[enemy.type];
+        }
+    }
+
+    // Draw bullets
+    for (const auto &b : bullets)
+    {
+        int cell = (screenWidth * (b.y + drawOffset)) + (b.x + drawOffset);
+        screen[cell] = L'|';
+    }
+
+    // Draw explosions
+    for (const auto &e : explosions)
+    {
+        int cell = (screenWidth * (e.y + drawOffset)) + (e.x + drawOffset);
+        screen[cell] = L'*';
+    }
+
+    // Draw player
+    for (int px = 0; px < playerWidth; ++px)
+    {
+        int cell = (screenWidth * (playerY + drawOffset)) + (playerX + px + drawOffset);
+        screen[cell] = L'A';
+    }
+
+    // Draw game information
+    // Score
+    int lineWidth = screenWidth;
+    std::wstring scoreStr = intToPaddedWString(score, 6, 4);
+    swprintf_s(&screen[(screenWidth) + (drawOffset)], lineWidth, L"SCORE<1> HI-SCORE SCORE<2>");
+    swprintf_s(&screen[(screenWidth * 2) + (drawOffset)], lineWidth, L"%ls", scoreStr.c_str());
+
+    // Lives
+    std::wstring playerIcon(playerWidth, displayValues[eDisplay::PLAYER]);
+    std::wstring livesDisplay = std::to_wstring(playerLives);
+
+    for (int i = 1; i < playerLives; ++i)
+    {
+        livesDisplay += L" " + playerIcon;
+    }
+
+    wmemset(&screen[(screenWidth * (actualHeight + 2)) + (drawOffset)], L' ', lineWidth);
+    swprintf_s(&screen[(screenWidth * (actualHeight + 2)) + (drawOffset)], lineWidth, L"%ls", livesDisplay.c_str());
+}
+
+#ifdef _MSC_VER
+#pragma endregion Main Loop Functions
+#endif
+
 int main()
 {
     DisableEcho();
@@ -351,8 +435,6 @@ int main()
     Setup();
     int drawOffset = 2;
     int actualHeight = fieldHeight + drawOffset;
-    int movingInvaderY = GetNextMovingRow();
-    eDirection invadersDirection = eDirection::RIGHT;
     std::unordered_map<char, bool> keyStates;
 
     // Run Game
@@ -562,75 +644,27 @@ int main()
         /* Logic END
          */
 
-        /* Draw START
-         */
-        for (int x = 0; x < fieldWidth; ++x)
-        {
-            for (int y = 0; y < fieldHeight; ++y)
-            {
-                screen[(screenWidth * (y + drawOffset)) + (x + drawOffset)] = displayValues[pField[(fieldWidth * y) + x]];
-            }
-
-            // Display line at the bottom of the field
-            screen[(screenWidth * actualHeight) + (x + drawOffset)] = L'_';
-        }
-
-        // Draw invaders
-        for (const auto &enemy : invaders)
-        {
-            int invaderWidth = invaderWidths[enemy.type];
-
-            for (int w = 0; w < invaderWidth; ++w)
-            {
-                screen[(screenWidth * (enemy.y + drawOffset)) + enemy.x + w + drawOffset] = displayValues[enemy.type];
-            }
-        }
-
-        // Draw bullets
-        for (const auto &b : bullets)
-        {
-            int cell = (screenWidth * (b.y + drawOffset)) + (b.x + drawOffset);
-            screen[cell] = L'|';
-        }
-
-        // Draw explosions
-        for (const auto &e : explosions)
-        {
-            int cell = (screenWidth * (e.y + drawOffset)) + (e.x + drawOffset);
-            screen[cell] = L'*';
-        }
-
-        // Draw player
-        for (int px = 0; px < playerWidth; ++px)
-        {
-            int cell = (screenWidth * (playerY + drawOffset)) + (playerX + px + drawOffset);
-            screen[cell] = L'A';
-        }
-
-        // Draw game information
-        // Score
-        int lineWidth = screenWidth;
-        std::wstring scoreStr = intToPaddedWString(score, 6, 4);
-        swprintf_s(&screen[(screenWidth) + (drawOffset)], lineWidth, L"SCORE<1> HI-SCORE SCORE<2>");
-        swprintf_s(&screen[(screenWidth * 2) + (drawOffset)], lineWidth, L"%ls", scoreStr.c_str());
-
-        // Lives
-        std::wstring playerIcon(playerWidth, displayValues[eDisplay::PLAYER]);
-        std::wstring livesDisplay = std::to_wstring(playerLives);
-
-        for (int i = 1; i < playerLives; ++i)
-        {
-            livesDisplay += L" " + playerIcon;
-        }
-
-        wmemset(&screen[(screenWidth * (actualHeight + 2)) + (drawOffset)], L' ', lineWidth);
-        swprintf_s(&screen[(screenWidth * (actualHeight + 2)) + (drawOffset)], lineWidth, L"%ls", livesDisplay.c_str());
-
-        /* Draw END
-         */
+        // Draw
+        Draw(drawOffset);
 
         // Display
         WriteConsoleOutputCharacterW(hConsole, screen, screenWidth * screenHeight, {0, 0}, &dwBytesWritten);
+
+        /* More Logic?! START
+         */
+        // Have you beaten the level?
+        if (invaders.empty())
+        {
+            Setup();
+            // TODO increase speed
+
+            // Quickly show the newly setup game with a pause
+            Draw(drawOffset);
+            WriteConsoleOutputCharacterW(hConsole, screen, screenWidth * screenHeight, {0, 0}, &dwBytesWritten);
+            std::this_thread::sleep_for(1s);
+        }
+        /* More Logic?! END
+         */
     }
 
     // Game over, tidy up
