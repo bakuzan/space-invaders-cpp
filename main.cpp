@@ -373,6 +373,15 @@ int main()
             if (invadersDirection == eDirection::DOWN)
             {
                 enemy.y += 1;
+
+                // Have Invaders reached the bottom?
+                if (enemy.y == playerY - 1)
+                {
+                    gameOver = true;
+                }
+
+                // Clear square (only has an effect if there is a barrier there)
+                pField[(fieldWidth * enemy.y) + enemy.x] = eDisplay::SPACE;
                 continue;
             }
 
@@ -384,6 +393,9 @@ int main()
             enemy.x += invadersDirection == eDirection::RIGHT
                            ? 1
                            : -1;
+
+            // Clear square (only has an effect if there is a barrier there)
+            pField[(fieldWidth * enemy.y) + enemy.x] = eDisplay::SPACE;
         }
 
         movingInvaderY = GetNextMovingRow(movingInvaderY);
