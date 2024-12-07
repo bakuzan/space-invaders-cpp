@@ -59,7 +59,7 @@ struct Explosion
 };
 
 int screenWidth = 80,
-    screenHeight = 30;
+    screenHeight = 40;
 wchar_t *screen;
 
 int fieldWidth = 51, fieldHeight = 25;
@@ -571,16 +571,16 @@ int main()
 
         // Draw game information
         std::wstring playerIcon(playerWidth, displayValues[eDisplay::PLAYER]);
-        std::wstring livesDisplay = std::to_wstring(playerLives) + L" " + playerIcon;
+        std::wstring livesDisplay = std::to_wstring(playerLives);
 
         for (int i = 1; i < playerLives; ++i)
         {
             livesDisplay += L" " + playerIcon;
         }
 
-        size_t length = livesDisplay.length();
-        swprintf_s(&screen[(screenWidth * (fieldHeight + 2)) + (drawOffsetX)], length + 1, L"%s", livesDisplay.c_str());
-        screen[(screenWidth * (fieldHeight + 2)) + (drawOffsetX) + length] = L'\0';
+        int lineWidth = screenWidth;
+        wmemset(&screen[(screenWidth * (fieldHeight + 2)) + (drawOffsetX)], L' ', lineWidth);
+        swprintf_s(&screen[(screenWidth * (fieldHeight + 2)) + (drawOffsetX)], lineWidth, L"%s", livesDisplay.c_str());
 
         /* Draw END
          */
@@ -590,18 +590,23 @@ int main()
     }
 
     // Game over, tidy up
-    CloseHandle(hConsole);
-    ClearInputBuffer();
-    EnableEcho();
+    swprintf_s(&screen[(screenWidth * (fieldHeight + 4)) + (drawOffsetX)], screenWidth, L"Game Over!");
 
-    // Wrap up the game
-    std::cout << "Game Over!" << std::endl;
+    WriteConsoleOutputCharacterW(hConsole, screen, screenWidth * screenHeight, {0, 0}, &dwBytesWritten);
+    std::this_thread::sleep_for(2s);
 
     // Wait to close...
     ClearInputBuffer();
-    std::cout << '\n'
-              << "Press any key to exit..." << std::endl;
+    EnableEcho();
+
+    swprintf_s(&screen[(screenWidth * (fieldHeight + 14)) + (drawOffsetX)], screenWidth, L"Press any key to exit...");
+    WriteConsoleOutputCharacterW(hConsole, screen, screenWidth * screenHeight, {0, 0}, &dwBytesWritten);
+
     _getch();
+
+    // Clean up things here
+    CloseHandle(hConsole);
+    ClearInputBuffer();
 
     delete[] screen;
     delete[] pField;
