@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <iomanip>
+#include <map>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -535,16 +536,28 @@ int main()
 
         // Invaders shoot?
         int invaderCount = invaders.size();
-        for (auto &enemy : invaders)
+        int shootingChance = std::max(1, 100 / invaderCount);
+        std::map<int, Invader *> bottomMostInvaders;
+
+        for (auto &invader : invaders)
         {
-            if (enemy.shootingCooldown > 0)
+            if (bottomMostInvaders.find(invader.x) == bottomMostInvaders.end() || invader.y > bottomMostInvaders[invader.x]->y)
             {
-                enemy.shootingCooldown--;
+                bottomMostInvaders[invader.x] = &invader;
             }
-            else if (rand() % 1000 < 1)
+        }
+
+        for (auto &entry : bottomMostInvaders)
+        {
+            auto *enemy = entry.second;
+            if (enemy->shootingCooldown > 0)
             {
-                enemy.shootingCooldown = 4 * invaderCount;
-                bullets.push_back({eDirection::DOWN, enemy.x + 1, enemy.y});
+                enemy->shootingCooldown--;
+            }
+            else if (rand() % 1000 < shootingChance)
+            {
+                enemy->shootingCooldown = 4 * invaderCount;
+                bullets.push_back({eDirection::DOWN, enemy->x + 1, enemy->y});
             }
         }
 
