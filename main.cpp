@@ -381,22 +381,27 @@ void Draw(int drawOffset)
 
     // Draw game information
     // Score
-    int lineWidth = screenWidth;
+    int lineWidth = fieldWidth;
     std::wstring scoreStr = intToPaddedWString(score, 6, 4);
     swprintf_s(&screen[(screenWidth) + (drawOffset)], lineWidth, L"SCORE<1> HI-SCORE SCORE<2>");
     swprintf_s(&screen[(screenWidth * 2) + (drawOffset)], lineWidth, L"%ls", scoreStr.c_str());
 
     // Lives
     std::wstring playerIcon(playerWidth, displayValues[eDisplay::PLAYER]);
-    std::wstring livesDisplay = std::to_wstring(playerLives);
+    std::wstring livesDisplay = L" " + std::to_wstring(playerLives);
 
     for (int i = 1; i < playerLives; ++i)
     {
         livesDisplay += L" " + playerIcon;
     }
 
+    std::wstring rightAlignedText = L"CREDIT 00";
+    int textLength = livesDisplay.length() + rightAlignedText.length();
+    int spacesNeeded = fieldWidth - textLength - 2;
+    std::wstring finalLine = livesDisplay + std::wstring(spacesNeeded, L' ') + rightAlignedText;
+
     wmemset(&screen[(screenWidth * (actualHeight + 2)) + (drawOffset)], L' ', lineWidth);
-    swprintf_s(&screen[(screenWidth * (actualHeight + 2)) + (drawOffset)], lineWidth, L"%ls", livesDisplay.c_str());
+    swprintf_s(&screen[(screenWidth * (actualHeight + 2)) + (drawOffset)], lineWidth, L"%ls", finalLine.c_str());
 }
 
 #ifdef _MSC_VER
@@ -668,7 +673,7 @@ int main()
     }
 
     // Game over, tidy up
-    swprintf_s(&screen[(screenWidth * (actualHeight + 4)) + (drawOffset)], screenWidth, L"Game Over!");
+    swprintf_s(&screen[(screenWidth * (actualHeight + 4)) + (drawOffset)], fieldWidth, L"Game Over!");
 
     WriteConsoleOutputCharacterW(hConsole, screen, screenWidth * screenHeight, {0, 0}, &dwBytesWritten);
     std::this_thread::sleep_for(2s);
@@ -677,7 +682,7 @@ int main()
     ClearInputBuffer();
     EnableEcho();
 
-    swprintf_s(&screen[(screenWidth * (actualHeight + 14)) + (drawOffset)], screenWidth, L"Press any key to exit...");
+    swprintf_s(&screen[(screenWidth * (actualHeight + 14)) + (drawOffset)], fieldWidth, L"Press any key to exit...");
     WriteConsoleOutputCharacterW(hConsole, screen, screenWidth * screenHeight, {0, 0}, &dwBytesWritten);
 
     _getch();
