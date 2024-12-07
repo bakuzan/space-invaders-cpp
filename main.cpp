@@ -4,6 +4,8 @@
 #include <conio.h>
 #include <cstdlib>
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -59,7 +61,7 @@ struct Explosion
 };
 
 int screenWidth = 80,
-    screenHeight = 40;
+    screenHeight = 45;
 wchar_t *screen;
 
 int fieldWidth = 51, fieldHeight = 25;
@@ -68,8 +70,10 @@ unsigned char *pField = nullptr;
 bool gameOver = false;
 int playerLives = 3;
 int playerX, playerY, playerWidth = 3;
+int score = 0;
 
 const int totalInvadersPerRow = 11;
+std::unordered_map<eDisplay, int> invaderScores{{eDisplay::SQUID, 30}, {eDisplay::CRAB, 20}, {eDisplay::OCTOPUS, 10}, {eDisplay::UFO, 0}};
 std::unordered_map<eDisplay, int> invaderWidths{{eDisplay::SQUID, 2}, {eDisplay::CRAB, 3}, {eDisplay::OCTOPUS, 3}, {eDisplay::UFO, 3}};
 std::vector<Invader> invaders;
 
@@ -115,6 +119,24 @@ void EnableEcho()
 #pragma endregion Helpers
 #endif
 
+std::wstring intToPaddedWString(int number, int totalWidth, int zeroPaddingWidth)
+{
+    std::wostringstream wss;
+    wss << std::setw(zeroPaddingWidth) << std::setfill(L'0') << number;
+    std::wstring zeroPaddedStr = wss.str();
+
+    int leadingSpaces = totalWidth - zeroPaddedStr.length();
+    if (leadingSpaces < 0)
+    {
+        leadingSpaces = 0; // Ensure non-negative
+    }
+
+    // Add leading spaces
+    std::wostringstream result;
+    result << std::setw(leadingSpaces) << L' ' << zeroPaddedStr;
+    return result.str();
+}
+
 void calculateBarriers(std::vector<int> &barrierPositions, int barrierWidth, int totalBarriers, int fixedSpacing)
 {
     int totalBarrierWidth = totalBarriers * barrierWidth;
@@ -154,6 +176,7 @@ void Setup()
     int fieldWidthMiddle = fieldWidth / 2;
     playerX = fieldWidthMiddle;
     playerY = fieldHeight - 1;
+    score = 0;
 
     // Populate invaders
     calculateInvaders(fieldWidthMiddle, 2, 4, eDisplay::SQUID, 1);
@@ -326,7 +349,8 @@ int main()
     DWORD dwBytesWritten = 0;
 
     Setup();
-    int drawOffsetX = 2;
+    int drawOffset = 2;
+    int actualHeight = fieldHeight + drawOffset;
     int movingInvaderY = GetNextMovingRow();
     eDirection invadersDirection = eDirection::RIGHT;
     std::unordered_map<char, bool> keyStates;
@@ -483,11 +507,13 @@ int main()
                 if (enemyIt != invaders.end())
                 {
                     int invaderWidth = invaderWidths[enemyIt->type];
+                    int scoredPoints = invaderScores[enemyIt->type];
                     for (int dx = 0; dx < invaderWidth; ++dx)
                     {
                         explosions.push_back({enemyIt->x + dx, enemyIt->y});
                     }
 
+                    score += scoredPoints;
                     invaders.erase(enemyIt);
                     it = bullets.erase(it);
                     continue;
@@ -542,11 +568,11 @@ int main()
         {
             for (int y = 0; y < fieldHeight; ++y)
             {
-                screen[(screenWidth * y) + (x + drawOffsetX)] = displayValues[pField[(fieldWidth * y) + x]];
+                screen[(screenWidth * (y + drawOffset)) + (x + drawOffset)] = displayValues[pField[(fieldWidth * y) + x]];
             }
 
             // Display line at the bottom of the field
-            screen[(screenWidth * fieldHeight) + (x + drawOffsetX)] = L'_';
+            screen[(screenWidth * actualHeight) + (x + drawOffset)] = L'_';
         }
 
         // Draw invaders
@@ -556,32 +582,39 @@ int main()
 
             for (int w = 0; w < invaderWidth; ++w)
             {
-                screen[(screenWidth * enemy.y) + enemy.x + w + drawOffsetX] = displayValues[enemy.type];
+                screen[(screenWidth * (enemy.y + drawOffset)) + enemy.x + w + drawOffset] = displayValues[enemy.type];
             }
         }
 
         // Draw bullets
         for (const auto &b : bullets)
         {
-            int cell = (screenWidth * b.y) + (b.x + drawOffsetX);
+            int cell = (screenWidth * (b.y + drawOffset)) + (b.x + drawOffset);
             screen[cell] = L'|';
         }
 
         // Draw explosions
         for (const auto &e : explosions)
         {
-            int cell = (screenWidth * e.y) + (e.x + drawOffsetX);
+            int cell = (screenWidth * (e.y + drawOffset)) + (e.x + drawOffset);
             screen[cell] = L'*';
         }
 
         // Draw player
         for (int px = 0; px < playerWidth; ++px)
         {
-            int cell = (screenWidth * playerY) + (playerX + px + drawOffsetX);
+            int cell = (screenWidth * (playerY + drawOffset)) + (playerX + px + drawOffset);
             screen[cell] = L'A';
         }
 
         // Draw game information
+        // Score
+        int lineWidth = screenWidth;
+        std::wstring scoreStr = intToPaddedWString(score, 6, 4);
+        swprintf_s(&screen[(screenWidth) + (drawOffset)], lineWidth, L"SCORE<1> HI-SCORE SCORE<2>");
+        swprintf_s(&screen[(screenWidth * 2) + (drawOffset)], lineWidth, L"%ls", scoreStr.c_str());
+
+        // Lives
         std::wstring playerIcon(playerWidth, displayValues[eDisplay::PLAYER]);
         std::wstring livesDisplay = std::to_wstring(playerLives);
 
@@ -590,9 +623,8 @@ int main()
             livesDisplay += L" " + playerIcon;
         }
 
-        int lineWidth = screenWidth;
-        wmemset(&screen[(screenWidth * (fieldHeight + 2)) + (drawOffsetX)], L' ', lineWidth);
-        swprintf_s(&screen[(screenWidth * (fieldHeight + 2)) + (drawOffsetX)], lineWidth, L"%s", livesDisplay.c_str());
+        wmemset(&screen[(screenWidth * (actualHeight + 2)) + (drawOffset)], L' ', lineWidth);
+        swprintf_s(&screen[(screenWidth * (actualHeight + 2)) + (drawOffset)], lineWidth, L"%ls", livesDisplay.c_str());
 
         /* Draw END
          */
@@ -602,7 +634,7 @@ int main()
     }
 
     // Game over, tidy up
-    swprintf_s(&screen[(screenWidth * (fieldHeight + 4)) + (drawOffsetX)], screenWidth, L"Game Over!");
+    swprintf_s(&screen[(screenWidth * (actualHeight + 4)) + (drawOffset)], screenWidth, L"Game Over!");
 
     WriteConsoleOutputCharacterW(hConsole, screen, screenWidth * screenHeight, {0, 0}, &dwBytesWritten);
     std::this_thread::sleep_for(2s);
@@ -611,7 +643,7 @@ int main()
     ClearInputBuffer();
     EnableEcho();
 
-    swprintf_s(&screen[(screenWidth * (fieldHeight + 14)) + (drawOffsetX)], screenWidth, L"Press any key to exit...");
+    swprintf_s(&screen[(screenWidth * (actualHeight + 14)) + (drawOffset)], screenWidth, L"Press any key to exit...");
     WriteConsoleOutputCharacterW(hConsole, screen, screenWidth * screenHeight, {0, 0}, &dwBytesWritten);
 
     _getch();

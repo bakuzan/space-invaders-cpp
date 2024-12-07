@@ -61,6 +61,8 @@
     "sstream": "cpp",
     "stop_token": "cpp",
     "thread": "cpp",
-    "unordered_map": "cpp"
+    "unordered_map": "cpp",
+    "list": "cpp",
+    "xhash": "cpp"
   }
 }
