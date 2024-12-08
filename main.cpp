@@ -456,7 +456,10 @@ int main()
     int level = 0;
     int drawOffset = 2;
     int actualHeight = fieldHeight + drawOffset;
+
     std::unordered_map<char, bool> keyStates;
+    int playerShootingCooldown = 0;
+    const int playerShootingCooldownMax = 20; // game is 20fps
 
     // Run Game
     while (!gameOver)
@@ -479,11 +482,11 @@ int main()
         {
             gameOver = true;
         }
-        if (keyStates[' '])
+        if (keyStates[' '] && playerShootingCooldown <= 0)
         {
-            // TODO throttle how often player can shoot
             // Player is 3 wide, so we want it to come from the middle
             bullets.push_back({eDirection::UP, playerX + 1, playerY});
+            playerShootingCooldown = playerShootingCooldownMax;
         }
 
         /* Input END
@@ -494,6 +497,12 @@ int main()
 
         // Clear down explosions
         explosions.clear();
+
+        // Player shooting cooldown
+        if (playerShootingCooldown > 0)
+        {
+            playerShootingCooldown--;
+        }
 
         // Invader movement
         for (auto &enemy : invaders)
