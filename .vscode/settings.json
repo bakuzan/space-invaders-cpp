@@ -63,6 +63,9 @@
     "thread": "cpp",
     "unordered_map": "cpp",
     "list": "cpp",
-    "xhash": "cpp"
+    "xhash": "cpp",
+    "map": "cpp",
+    "random": "cpp",
+    "xtree": "cpp"
   }
 }

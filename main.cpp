@@ -6,6 +6,7 @@
 #include <iostream>
 #include <iomanip>
 #include <map>
+#include <random>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -53,6 +54,7 @@ struct Bullet
     eDirection direction;
     int x;
     int y;
+    bool forRemoval = false;
 };
 
 struct Explosion
@@ -122,6 +124,14 @@ void EnableEcho()
 #ifdef _MSC_VER
 #pragma endregion Helpers
 #endif
+
+bool randomChance(float probability)
+{
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_real_distribution<> dis(0.0, 1.0);
+    return dis(gen) < probability;
+}
 
 std::wstring intToPaddedWString(int number, int totalWidth, int zeroPaddingWidth)
 {
@@ -281,6 +291,7 @@ void Setup()
     explosions.clear();
 
     // Populate invaders
+    // TODO START LOWER EACH LEVEL UPTO 5 ROWS LOWER
     calculateInvaders(fieldWidthMiddle, 2, 4, eDisplay::SQUID, 1);
     calculateInvaders(fieldWidthMiddle, 4, 8, eDisplay::CRAB);
     calculateInvaders(fieldWidthMiddle, 8, 12, eDisplay::OCTOPUS);
@@ -466,6 +477,7 @@ int main()
         }
         if (keyStates[' '])
         {
+            // TODO throttle how often player can shoot
             // Player is 3 wide, so we want it to come from the middle
             bullets.push_back({eDirection::UP, playerX + 1, playerY});
         }
@@ -562,8 +574,13 @@ int main()
         }
 
         // Bullet movement
-        for (auto it = bullets.begin(); it != bullets.end();)
+        for (auto it = bullets.begin(); it != bullets.end(); ++it)
         {
+            if (it->forRemoval)
+            {
+                continue;
+            }
+
             int diffY = it->direction == eDirection::UP
                             ? -1
                             : 1;
@@ -574,7 +591,49 @@ int main()
             }
             else
             {
-                it = bullets.erase(it);
+                it->forRemoval = true;
+                continue;
+            }
+
+            // Check for bullet on bullet collisions
+            bool bulletDestroyed = false;
+            for (auto other = bullets.begin(); other != bullets.end(); ++other)
+            {
+                if (it != other &&
+                    it->x == other->x &&
+                    it->y == other->y)
+                {
+                    if (it->direction == eDirection::UP &&
+                        other->direction == eDirection::DOWN)
+                    {
+                        // Destroy player's bullet
+                        it->forRemoval = true;
+
+                        // Random chance to destroy invader's bullet
+                        if (randomChance(0.5))
+                        {
+                            other->forRemoval = true;
+                        }
+                        break;
+                    }
+                    else if (it->direction == eDirection::DOWN &&
+                             other->direction == eDirection::UP)
+                    {
+                        // Destroy player's bullet
+                        other->forRemoval = true;
+
+                        // Random chance to destroy invader's bullet
+                        if (randomChance(0.5))
+                        {
+                            it->forRemoval = true;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (it->forRemoval)
+            {
                 continue;
             }
 
@@ -583,11 +642,9 @@ int main()
             {
                 explosions.push_back({it->x, it->y});
                 pField[(fieldWidth * it->y) + it->x] = eDisplay::SPACE;
-                it = bullets.erase(it);
-                continue;
+                it->forRemoval = true;
             }
-
-            if (it->direction == eDirection::UP)
+            else if (it->direction == eDirection::UP)
             {
                 // Hit invader?
                 auto enemyIt = std::find_if(invaders.begin(), invaders.end(),
@@ -615,8 +672,7 @@ int main()
 
                     score += scoredPoints;
                     invaders.erase(enemyIt);
-                    it = bullets.erase(it);
-                    continue;
+                    it->forRemoval = true;
                 }
             }
             else
@@ -643,7 +699,7 @@ int main()
                         playerX = fieldWidth / 2;
                         playerY = fieldHeight - 1;
 
-                        it = bullets.erase(it);
+                        it->forRemoval = true;
                         playerHit = true;
                         break;
                     }
@@ -654,10 +710,15 @@ int main()
                     continue;
                 }
             }
-
-            // Go next bullet
-            ++it;
         }
+
+        // Remove bullets marked as collided
+        bullets.erase(std::remove_if(bullets.begin(), bullets.end(),
+                                     [](const Bullet &bullet)
+                                     {
+                                         return bullet.forRemoval;
+                                     }),
+                      bullets.end());
 
         /* Logic END
          */
@@ -674,7 +735,10 @@ int main()
         if (invaders.empty())
         {
             Setup();
-            // TODO increase speed
+
+            // TODO start invaders lower(?)
+            // TODO increase speed of invaders
+            // TODO increase shooting chance of invaders
 
             // Quickly show the newly setup game with a pause
             Draw(drawOffset);
