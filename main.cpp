@@ -280,7 +280,7 @@ bool CanBulletMove(int newBulletY)
 #pragma region Main Loop Functions
 #endif
 
-void Setup()
+void Setup(int invaderRowOffset = 0)
 {
     gameOver = false;
 
@@ -293,10 +293,9 @@ void Setup()
     explosions.clear();
 
     // Populate invaders
-    // TODO START LOWER EACH LEVEL UPTO 5 ROWS LOWER
-    calculateInvaders(fieldWidthMiddle, 2, 4, eDisplay::SQUID, 1);
-    calculateInvaders(fieldWidthMiddle, 4, 8, eDisplay::CRAB);
-    calculateInvaders(fieldWidthMiddle, 8, 12, eDisplay::OCTOPUS);
+    calculateInvaders(fieldWidthMiddle, 2 + invaderRowOffset, 4 + invaderRowOffset, eDisplay::SQUID, 1);
+    calculateInvaders(fieldWidthMiddle, 4 + invaderRowOffset, 8 + invaderRowOffset, eDisplay::CRAB);
+    calculateInvaders(fieldWidthMiddle, 8 + invaderRowOffset, 12 + invaderRowOffset, eDisplay::OCTOPUS);
 
     // Invader movement starting
     movingInvaderY = GetNextMovingRow();
@@ -454,6 +453,7 @@ int main()
     DWORD dwBytesWritten = 0;
 
     Setup();
+    int level = 0;
     int drawOffset = 2;
     int actualHeight = fieldHeight + drawOffset;
     std::unordered_map<char, bool> keyStates;
@@ -768,9 +768,9 @@ int main()
         // Have you beaten the level?
         if (invaders.empty())
         {
-            Setup();
+            level++;
+            Setup(level > 5 ? 5 : level);
 
-            // TODO start invaders lower(?)
             // TODO increase speed of invaders
             // TODO increase shooting chance of invaders
 
