@@ -18,6 +18,11 @@
 
 using namespace std::chrono_literals;
 
+/** TODO
+ *  1) Implement UFO invader
+ *  2) Implement highscore keeping
+ */
+
 #ifdef _MSC_VER
 #pragma region Globals
 #endif
@@ -456,10 +461,17 @@ int main()
     int level = 0;
     int drawOffset = 2;
     int actualHeight = fieldHeight + drawOffset;
-
     std::unordered_map<char, bool> keyStates;
+
     int playerShootingCooldown = 0;
     const int playerShootingCooldownMax = 20; // game is 20fps
+
+    float invaderShootingChanceRate = 100.0f;
+    float initialInvaderSpeed = 5.0f;
+    float invaderSpeed = initialInvaderSpeed;
+    float invaderSpeedIncreaseRate = 0.1f;
+    float invaderSpeedMax = 0.5f;
+    int invaderMoveCounter = 0;
 
     // Run Game
     while (!gameOver)
@@ -505,63 +517,72 @@ int main()
         }
 
         // Invader movement
-        for (auto &enemy : invaders)
+        if (invaderMoveCounter >= invaderSpeed)
         {
-            if (invadersDirection == eDirection::DOWN)
+            for (auto &enemy : invaders)
             {
-                enemy.y += 1;
-
-                // Have Invaders reached the bottom?
-                if (enemy.y == playerY - 1)
+                if (invadersDirection == eDirection::DOWN)
                 {
-                    gameOver = true;
+                    enemy.y += 1;
+
+                    // Have Invaders reached the bottom?
+                    if (enemy.y == playerY - 1)
+                    {
+                        gameOver = true;
+                    }
+
+                    // Clear square (only has an effect if there is a barrier there)
+                    pField[(fieldWidth * enemy.y) + enemy.x] = eDisplay::SPACE;
+                    continue;
                 }
+
+                if (enemy.y != movingInvaderY)
+                {
+                    continue;
+                }
+
+                enemy.x += invadersDirection == eDirection::RIGHT
+                               ? 1
+                               : -1;
 
                 // Clear square (only has an effect if there is a barrier there)
                 pField[(fieldWidth * enemy.y) + enemy.x] = eDisplay::SPACE;
-                continue;
             }
 
-            if (enemy.y != movingInvaderY)
+            movingInvaderY = GetNextMovingRow(movingInvaderY);
+            if (movingInvaderY == -1)
             {
-                continue;
+                if (
+                    ((invadersDirection == eDirection::RIGHT &&
+                      CheckInvadersAreAtRightWall()) ||
+                     (invadersDirection == eDirection::LEFT &&
+                      CheckInvadersAreAtLeftWall())))
+                {
+                    movingInvaderY = -1; // Will allow reset on next pass
+                    invadersDirection = eDirection::DOWN;
+                }
+                else
+                {
+                    movingInvaderY = GetNextMovingRow();
+                }
+            }
+            else if (invadersDirection == eDirection::DOWN &&
+                     movingInvaderY != -1)
+            {
+                invadersDirection =
+                    CheckInvadersAreAtLeftWall() ? eDirection::RIGHT : eDirection::LEFT;
             }
 
-            enemy.x += invadersDirection == eDirection::RIGHT
-                           ? 1
-                           : -1;
-
-            // Clear square (only has an effect if there is a barrier there)
-            pField[(fieldWidth * enemy.y) + enemy.x] = eDisplay::SPACE;
+            invaderMoveCounter = 0;
         }
-
-        movingInvaderY = GetNextMovingRow(movingInvaderY);
-        if (movingInvaderY == -1)
+        else
         {
-            if (
-                ((invadersDirection == eDirection::RIGHT &&
-                  CheckInvadersAreAtRightWall()) ||
-                 (invadersDirection == eDirection::LEFT &&
-                  CheckInvadersAreAtLeftWall())))
-            {
-                movingInvaderY = -1; // Will allow reset on next pass
-                invadersDirection = eDirection::DOWN;
-            }
-            else
-            {
-                movingInvaderY = GetNextMovingRow();
-            }
-        }
-        else if (invadersDirection == eDirection::DOWN &&
-                 movingInvaderY != -1)
-        {
-            invadersDirection =
-                CheckInvadersAreAtLeftWall() ? eDirection::RIGHT : eDirection::LEFT;
+            invaderMoveCounter++;
         }
 
         // Invaders shoot?
         int invaderCount = invaders.size();
-        int shootingChance = std::max(1, 100 / invaderCount);
+        float shootingChance = std::max(1.0f, invaderShootingChanceRate / invaderCount);
         std::map<int, Invader *> bottomMostInvaders;
         std::set<Invader *> processedInvaders;
 
@@ -716,6 +737,12 @@ int main()
                     score += scoredPoints;
                     invaders.erase(enemyIt);
                     it->forRemoval = true;
+
+                    // Invader was killed
+                    if (invaderSpeed > invaderSpeedMax)
+                    {
+                        invaderSpeed -= invaderSpeedIncreaseRate;
+                    }
                 }
             }
             else
@@ -778,10 +805,12 @@ int main()
         if (invaders.empty())
         {
             level++;
-            Setup(level > 5 ? 5 : level);
 
-            // TODO increase speed of invaders
-            // TODO increase shooting chance of invaders
+            // Increase difficulty
+            invaderSpeed = std::max(invaderSpeedMax, initialInvaderSpeed - (level * 0.5f));
+            invaderShootingChanceRate += 5;
+
+            Setup(level > 5 ? 5 : level);
 
             // Quickly show the newly setup game with a pause
             Draw(drawOffset);
