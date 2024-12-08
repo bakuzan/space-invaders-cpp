@@ -3,10 +3,12 @@
 #include <chrono>
 #include <conio.h>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <iomanip>
 #include <map>
 #include <random>
+#include <set>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -424,6 +426,8 @@ int main()
 {
     DisableEcho();
 
+    // std::ofstream logFile("invader_debug.log");
+
     // Console size check
     if (!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &sbInfo))
     {
@@ -550,18 +554,48 @@ int main()
         int invaderCount = invaders.size();
         int shootingChance = std::max(1, 100 / invaderCount);
         std::map<int, Invader *> bottomMostInvaders;
+        std::set<Invader *> processedInvaders;
 
         for (auto &invader : invaders)
         {
-            if (bottomMostInvaders.find(invader.x) == bottomMostInvaders.end() || invader.y > bottomMostInvaders[invader.x]->y)
+            bool isBottom = true;
+            int invaderX = invader.x;
+            if (invader.type == eDisplay::SQUID)
             {
-                bottomMostInvaders[invader.x] = &invader;
+                invaderX = invader.x - 1;
+            }
+
+            for (int dx = 0; dx < invaderWidths[invader.type]; ++dx)
+            {
+                int invaderColumn = invaderX + dx;
+
+                if (bottomMostInvaders.find(invaderColumn) != bottomMostInvaders.end() &&
+                    invader.y < bottomMostInvaders[invaderColumn]->y)
+                {
+                    isBottom = false;
+                    break;
+                }
+            }
+
+            if (isBottom)
+            {
+                for (int dx = 0; dx < invaderWidths[invader.type]; ++dx)
+                {
+                    int invaderColumn = invaderX + dx;
+                    if (bottomMostInvaders[invaderColumn] != nullptr)
+                    {
+                        processedInvaders.erase(bottomMostInvaders[invaderColumn]);
+                    }
+
+                    bottomMostInvaders[invaderColumn] = &invader;
+                }
+
+                processedInvaders.insert(&invader);
             }
         }
 
-        for (auto &entry : bottomMostInvaders)
+        for (auto *enemy : processedInvaders)
         {
-            auto *enemy = entry.second;
             if (enemy->shootingCooldown > 0)
             {
                 enemy->shootingCooldown--;
@@ -767,6 +801,8 @@ int main()
     // Clean up things here
     CloseHandle(hConsole);
     ClearInputBuffer();
+
+    // logFile.close();
 
     delete[] screen;
     delete[] pField;
